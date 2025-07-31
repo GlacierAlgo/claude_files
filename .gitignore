@@ -1,0 +1,28 @@
+# Claude Code Configuration - Local Files Only
+# Keep only core configuration files in git, exclude session data
+
+# Session data and project logs
+projects/
+todos/
+
+# User-specific settings and cache
+settings.json
+.claude.json
+statsig/
+
+# System files
+.DS_Store
+**/.DS_Store
+
+# Command development artifacts
+commands/.claude/
+commands/.DS_Store
+
+# Temporary and local-only command experiments
+commands/micropomodoro.md
+
+# Any future local session or cache files
+*.local
+*.cache
+session-*
+temp-*
