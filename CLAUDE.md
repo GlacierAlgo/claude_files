@@ -36,6 +36,95 @@
 2. **Second strike**: Copy-paste with changes
 3. **Third strike**: Now create abstraction
 
+## Extreme Programming (XP) Principles
+
+### YAGNI (You Aren't Gonna Need It)
+**Core Principle**: Don't implement features until they are actually needed
+
+**Application**:
+- **Magic Numbers Stay**: If a value hasn't changed, don't make it configurable
+- **Parameters at Optimum**: If page_size=100 is the tested maximum, keep it hardcoded
+- **No Speculative Abstraction**: Wait for real requirements, not imagined ones
+
+```python
+# ❌ Over-engineering for imaginary flexibility
+class ConfigurableRetryHandler:
+    def __init__(self, max_retries=3, backoff_factor=2.0):
+        self.max_retries = max_retries
+        self.backoff_factor = backoff_factor
+
+# ✅ YAGNI - Direct implementation
+async def fetch_with_retry(url):
+    for attempt in range(3):  # This number has never needed to change
+        try:
+            return await fetch(url)
+        except Exception:
+            if attempt == 2: raise
+            await asyncio.sleep(2 ** attempt)
+```
+
+### DRY with Three-Strikes Rule
+**Principle**: Don't Repeat Yourself - but only after actual repetition occurs
+
+**Implementation**:
+- First occurrence: Write inline
+- Second occurrence: Copy and modify
+- Third occurrence: Extract common functionality
+
+### Simple Design (XP's Four Rules)
+1. **Passes all tests** - Works correctly for current requirements
+2. **Reveals intention** - Code clearly expresses its purpose
+3. **No duplication** - But only remove actual, not potential duplication
+4. **Fewest elements** - Minimal classes, methods, and abstractions
+
+### Continuous Refactoring
+**Principle**: Refactor when you have evidence, not speculation
+
+**Good Refactoring Triggers**:
+- Actual code duplication (not similarity)
+- Difficulty making required changes
+- Confusion from team members
+
+**Bad Refactoring Triggers**:
+- "This might be useful later"
+- "This could be more elegant"
+- "What if we need to..."
+
+### Embrace Change Through Simplicity
+**Philosophy**: Simple code is easier to change than "flexible" code
+
+```python
+# ❌ Flexible but complex
+class AbstractNewsProcessor(ABC):
+    @abstractmethod
+    def process(self, data: Dict[str, Any]) -> ProcessedData:
+        pass
+
+class SinaNewsProcessor(AbstractNewsProcessor):
+    def __init__(self, config: ProcessorConfig):
+        self.config = config
+    
+    def process(self, data: Dict[str, Any]) -> ProcessedData:
+        # Complex processing with many configuration options
+
+# ✅ Simple and direct
+def process_sina_news(articles):
+    return [
+        {
+            "id": article["id"],
+            "text": article["rich_text"],
+            "time": article["create_time"]
+        }
+        for article in articles
+        if article.get("id") and article.get("rich_text")
+    ]
+```
+
+### XP's Feedback Loops
+1. **Immediate Feedback**: Let errors fail fast and loud
+2. **Frequent Releases**: Deploy working code, not perfect code
+3. **Real User Feedback**: Build what users ask for, not what you think they need
+
 ### Refactoring Philosophy
 **Core Principle**: Refactor to eliminate duplication, not to achieve "better architecture"
 
