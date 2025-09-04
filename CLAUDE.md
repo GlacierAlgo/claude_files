@@ -389,6 +389,327 @@ async def main():
 - **No .env Comments**: Never use inline comments in .env files
 - **Avoid node_modules**: Never look into node_modules
 
+## Python CLI Standards
+
+### Package Management with UV
+- **Primary Tool**: Use `uv` for all Python package management operations
+- **Installation**: `uv add package_name` instead of pip install
+- **Dependencies**: Use `uv lock` to generate lock files
+- **Virtual Environments**: `uv` automatically manages virtual environments
+- **Scripts**: Define scripts in `pyproject.toml` under `[project.scripts]`
+
+### CLI Development with Click
+- **Framework**: Use `click` instead of `argparse` for CLI applications
+- **Pattern**: Create `cli.py` as the main command interface
+- **Structure**: Use click groups for multiple commands
+- **Integration**: Combine click with the Command Dispatcher Pattern
+
+```python
+# ✅ Click-based CLI structure
+import click
+from .operations import sync_data, stream_data, fill_gaps
+
+@click.group()
+def cli():
+    """Quantitative finance data processing tools."""
+    pass
+
+@cli.command()
+@click.option('--batch-size', default=100, help='Batch size for processing')
+def sync(batch_size: int):
+    """Synchronize data incrementally."""
+    sync_data(batch_size)
+
+@cli.command() 
+@click.option('--start-id', required=True, type=int)
+@click.option('--end-id', required=True, type=int)
+def fill_gaps(start_id: int, end_id: int):
+    """Fill missing data for ID range."""
+    fill_gaps(start_id, end_id)
+
+if __name__ == '__main__':
+    cli()
+```
+
+### Environment Management with dotenv
+- **Files**: Use `.env` for defaults, `.env.local` for local overrides
+- **Loading**: Use `python-dotenv` to load environment variables
+- **Hierarchy**: `.env.local` > `.env` > system environment
+- **Frequency-Based Configuration**:
+  - `.env`: Parameters that change frequently (BATCH_SIZE, API_KEYS)
+  - Code constants: Implementation details that rarely change
+
+```python
+# ✅ Environment configuration pattern
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # Loads .env, then .env.local if it exists
+
+# Frequently adjusted parameters
+BATCH_SIZE = int(os.getenv('BATCH_SIZE', 100))
+MAX_CONCURRENT = int(os.getenv('MAX_CONCURRENT', 10))
+API_KEY = os.getenv('API_KEY')
+
+# Implementation constants (rarely change)
+API_BASE_URL = "https://api.example.com/v1"
+DEFAULT_TIMEOUT = 30
+```
+
+### Project Structure for Python CLI Tools
+**Architecture Principle**: 横切分层 (Horizontal Layering) + 竖切业务 (Vertical Business Slicing)
+
+#### Flat Architecture (PyTorch-style)
+```
+project/
+├── pyproject.toml          # UV project config + scripts
+├── .env                    # Default environment variables  
+├── .env.local             # Local overrides (gitignored)
+├── cli.py                 # Click-based command interface
+├── src/
+│   ├── __init__.py        # Main exports like PyTorch
+│   ├── config.py          # Configuration management
+│   ├── logging.py         # Logging setup
+│   ├── database.py        # Database operations
+│   ├── api_client.py      # External API client
+│   ├── market_data.py     # Market data business logic
+│   ├── portfolio.py       # Portfolio management
+│   ├── risk.py            # Risk calculations
+│   ├── reporting.py       # Reporting logic
+│   ├── sync.py            # Sync operations
+│   ├── streaming.py       # Streaming operations
+│   └── utils.py           # Shared utilities
+```
+
+#### Import Pattern (PyTorch-style)
+```python
+# src/__init__.py - Central exports like torch/__init__.py
+from .market_data import get_prices, calculate_returns
+from .portfolio import Portfolio, optimize_weights
+from .risk import calculate_var, stress_test
+from .database import connect, query_data
+from .config import load_config
+
+# Usage - Clean absolute imports
+from src import get_prices, Portfolio, calculate_var
+from src.config import load_config
+from src.database import connect
+
+# NOT relative imports like:
+# from ..database import connect  # ❌
+# from .utils import helper       # ❌
+```
+
+#### Vertical Business Slices (竖切 - Business Logic Flow)
+Business features串联multiple modules across the flat architecture:
+
+```python
+# Example: Market Data Sync (竖切业务流)
+# cli.py
+@cli.command()
+def sync_market():
+    from src import sync_market_data  # Clean import from main package
+
+# sync.py (Application orchestration)  
+def sync_market_data():
+    config = load_config()           # config.py
+    client = create_api_client()     # api_client.py  
+    data = fetch_market_data(client) # market_data.py
+    store_data(data)                # database.py
+    log_completion()                # logging.py
+
+# Business logic flows through flat modules without deep nesting
+```
+
+#### Layer Responsibilities (Flat Architecture)
+- **cli.py**: Command interface, delegates to application modules
+- **config.py**: Environment and configuration management  
+- **database.py**: All data access operations
+- **api_client.py**: External API integrations
+- **{business}.py**: Domain-specific business logic (market_data.py, portfolio.py, etc.)
+- **{operation}.py**: Application workflows (sync.py, streaming.py, etc.)
+- **utils.py**: Shared utilities and helpers
+
+#### Business Extension Pattern
+Add new features by creating new modules and updating exports:
+
+1. **New Domain**: Create `new_feature.py` with business logic
+2. **New Operation**: Create `new_operation.py` for workflows
+3. **Update Exports**: Add to `src/__init__.py` for clean imports
+4. **CLI Integration**: Add commands to `cli.py`
+5. **Reuse Infrastructure**: Use existing `database.py`, `api_client.py`, etc.
+
+```python
+# Adding new feature - flat and simple
+# src/backtesting.py (new domain)
+def run_backtest(strategy, data): ...
+
+# src/batch_backtest.py (new operation) 
+def batch_backtest(): 
+    data = query_data()      # reuse database.py
+    strategy = load_strategy() # reuse config.py
+    results = run_backtest(strategy, data) # use backtesting.py
+
+# src/__init__.py (update exports)
+from .backtesting import run_backtest
+from .batch_backtest import batch_backtest
+```
+
+### CLI Integration Pattern
+**Combine Click + Command Dispatcher + Environment Management**
+
+```python
+# cli.py - Entry point
+import click
+from dotenv import load_dotenv
+from .operations import sync, stream, detect_gaps
+
+load_dotenv()
+
+@click.group()
+@click.option('--verbose', is_flag=True, help='Enable verbose logging')
+def cli(verbose):
+    """Data processing toolkit."""
+    setup_logging(verbose)
+
+@cli.command()
+@click.option('--batch-size', envvar='BATCH_SIZE', default=100)
+def sync(batch_size):
+    """Sync data incrementally."""
+    sync.run_incremental_sync(batch_size)
+
+# pyproject.toml
+[project.scripts]
+tools = "src.cli:cli"
+```
+
+This allows both:
+- `uv run tools sync --batch-size 50` (direct invocation)
+- `python -m src.cli sync` (module execution)  
+- Environment variable control via `.env` files
+
+---
+
+# 🏗️ PYTORCH ARCHITECTURE ANALYSIS (2024)
+
+## PyTorch的实际混合式架构
+
+基于对PyTorch最新代码库的分析，PyTorch采用的是**混合式架构**，而非纯扁平结构：
+
+### 1. 顶层组织策略
+```python
+# PyTorch实际结构 - 智能分层
+torch/
+├── __init__.py           # 统一API导出
+├── _C/                   # 底层C++绑定
+├── nn/                   # 神经网络模块群
+│   ├── __init__.py       # nn的统一导出
+│   ├── functional.py     # 核心函数实现
+│   ├── modules/          # 具体层类型
+│   ├── attention/        # 注意力机制专门化
+│   ├── quantized/        # 量化专门化
+│   └── parallel/         # 并行处理专门化
+├── optim/                # 优化器模块群
+├── utils/                # 工具函数集群
+├── autograd/             # 自动微分系统
+├── distributed/          # 分布式计算
+├── backends/             # 硬件后端抽象
+└── 60+ specialized dirs  # 领域专门化目录
+```
+
+### 2. 关键架构原则
+
+#### A. 按复杂度分层
+- **简单功能**: 单文件模块 (如某些utils)
+- **中等复杂**: 子目录 + 主文件 (nn/functional.py)  
+- **高度复杂**: 深层子目录结构 (nn/modules/, nn/quantized/)
+
+#### B. 统一导出策略
+```python
+# torch/__init__.py 提供顶层API
+import torch
+torch.nn.Linear()    # 实际来自 torch/nn/modules/linear.py
+torch.optim.Adam()   # 实际来自 torch/optim/adam.py
+torch.cuda.is_available() # 来自 torch/cuda/__init__.py
+
+# 用户无需知道内部复杂结构
+```
+
+#### C. 领域专门化
+```python
+# nn模块内部进一步专门化
+torch/nn/
+├── functional.py      # 无状态函数
+├── modules/          # 有状态层
+│   ├── linear.py
+│   ├── conv.py
+│   └── rnn.py
+├── attention/        # 注意力机制独立模块
+├── quantized/        # 量化神经网络独立模块
+└── parallel/         # 并行处理独立模块
+```
+
+### 3. 对量化项目的启示
+
+#### 采用PyTorch式混合架构
+```python
+# ✅ 基于复杂度的智能分层
+quant_project/
+├── pyproject.toml
+├── .env / .env.local
+├── cli.py                    # 命令入口
+├── src/
+│   ├── __init__.py          # 统一API导出
+│   ├── config.py            # 简单 - 单文件
+│   ├── utils.py             # 简单 - 单文件  
+│   ├── database.py          # 中等 - 单文件
+│   ├── market_data/         # 复杂 - 子目录
+│   │   ├── __init__.py
+│   │   ├── fetchers.py      # 数据获取
+│   │   ├── processors.py    # 数据处理
+│   │   └── validators.py    # 数据验证
+│   ├── portfolio/           # 复杂 - 子目录
+│   │   ├── __init__.py
+│   │   ├── optimization.py  # 投资组合优化
+│   │   ├── rebalancing.py   # 再平衡
+│   │   └── risk_models.py   # 风险模型
+│   ├── backtesting/         # 高度复杂 - 深层子目录
+│   │   ├── __init__.py
+│   │   ├── engines/         # 回测引擎
+│   │   ├── metrics/         # 评估指标
+│   │   └── reports/         # 报告生成
+│   └── streaming/           # 中等 - 子目录
+│       ├── __init__.py
+│       ├── real_time.py     # 实时数据
+│       └── batch.py         # 批量处理
+```
+
+#### 导出策略
+```python
+# src/__init__.py - PyTorch风格的API设计
+from .config import load_config
+from .database import connect, save_data
+from .utils import setup_logging
+
+# 从复杂模块导出关键API
+from .market_data import fetch_prices, process_ohlc
+from .portfolio import Portfolio, optimize_weights
+from .backtesting import BacktestEngine, run_backtest
+
+# 使用体验
+from src import fetch_prices, Portfolio, run_backtest
+# 而不是复杂的 from src.market_data.fetchers import fetch_prices
+```
+
+### 4. 架构决策原则
+
+1. **复杂度导向**: 简单功能用单文件，复杂领域用子目录
+2. **用户友好**: 通过统一导出隐藏内部复杂性  
+3. **领域内聚**: 相关功能聚合在同一子目录内
+4. **扩展灵活**: 新功能可独立添加子目录而不影响现有结构
+
+这种混合式架构比纯扁平结构更适合复杂项目，既保持了简单性又支持了可扩展性。
+
 ## Documentation Links
 - **SiliconCloud/SiliconFlow LLMs Documentation**:
   - Navigation: https://docs.siliconflow.cn/llms.txt
@@ -683,3 +1004,5 @@ def process_and_store(data):
 2. **Easy for operators to use and troubleshoot**  
 3. **Changes to business requirements require minimal code changes**
 4. **New team members can understand and modify the system quickly**
+- My Obsidian vault is at /Users/yanghh/obs. If you need to write down any summaries, notes, or knowledge pages, this is where you want to save them.
+- NEVER GIT COMMIT WITH CLAUDE CODE COAUTHORSHIP
