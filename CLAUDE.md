@@ -156,36 +156,60 @@ async def fill_gaps(start_id, end_id):
 
 ## Architecture Decision Framework
 
-### Design Decision Matrix
+### Function vs Class 决策指南
+
+**优先考虑Function的场景**:
+- 无状态计算和数据转换
+- 简单的工具操作
+- 纯函数式逻辑
+
+**考虑使用Class的场景**:
+- 需要管理内部状态
+- 需要管理资源（数据库连接、文件句柄）
+- 复杂配置需要封装
+- 需要生命周期管理（setup/teardown）
+
+**灵活处理**:
+- 简单的有状态逻辑可以用闭包或模块级变量
+- 复杂的无状态逻辑可以用类来组织（如策略模式）
+- 不要机械套用规则，根据实际情况判断
+
+**决策问题**:
+1. 这段逻辑需要记住状态吗？
+2. 需要管理外部资源吗？
+3. 配置复杂到需要封装吗？
+4. 需要多个相关方法协作吗？
+
+**示例**:
+```python
+# ✅ Function - 无状态转换
+def calculate_tax(amount: float, rate: float = 0.08) -> float:
+    return amount * rate
+
+# ✅ Class - 有状态管理
+class DatabaseConnection:
+    def __init__(self, url: str):
+        self.url = url
+        self.connection = None
+
+    def connect(self): ...
+    def close(self): ...
+
+# ✅ 灵活 - 简单状态用闭包
+def create_counter():
+    count = 0
+    def increment():
+        nonlocal count
+        count += 1
+        return count
+    return increment
 ```
-Scenario              | State? | Resources? | Config? | Choice
----------------------|--------|------------|---------|--------
-Data Processing      | No     | No         | Simple  | Function
-API Client           | Yes    | Yes        | Complex | Class
-Database Connection  | Yes    | Yes        | Complex | Class
-Format Conversion    | No     | No         | Simple  | Function
-Configuration Mgmt   | Yes    | No         | Complex | Class
-Error Handling       | No     | No         | Simple  | Function
-Session Management   | Yes    | Yes        | Complex | Class
-Utility Operations   | No     | No         | Simple  | Function
-```
 
-### Decision Criteria
-1. **State Management**: Does it need to remember information between calls?
-2. **Resource Management**: Does it manage connections, files, or system resources?
-3. **Complex Configuration**: Does it have multiple related settings?
-4. **Lifecycle Management**: Does it need setup/teardown operations?
-
-### Quality Standards
-- **Classes**: When maintaining state, managing resources, or handling complex configuration
-- **Functions**: When performing pure computation, simple transformation, or utility operations
-- **Hybrid**: Classes provide state management, functions handle specific logic internally
-
-**Validation Criteria**:
-- Is the code easy to test?
-- Does naming directly express intent?
-- Does it follow single responsibility principle?
-- Is it easy to understand and maintain?
+**验证标准**:
+- 代码易于测试吗？
+- 命名清晰表达意图吗？
+- 遵循单一职责原则吗？
+- 易于理解和维护吗？
 
 ---
 
@@ -227,24 +251,63 @@ def get_payment_status(transaction_id: str) -> str:
 
 ## Naming Conventions
 
-### Core Standards
-- **Full Names**: Never abbreviate variable or function names
-- **No Type in Names**: Don't include type information in variable names
-- **Units in Variables**: Add units to variables unless type already indicates them
-- **No Type in Type Definitions**: Don't redundantly include type info in type definitions
+### 命名原则
+
+**优先使用清晰的完整名称**:
+- `user_count` 优于 `usr_cnt`
+- `calculate_total_price` 优于 `calc_tot_prc`
+- `process_payment` 优于 `proc_pmt`
+
+**可接受的约定俗成缩写**:
+- **领域通用**: `id`, `url`, `api`, `db`, `df` (DataFrame), `ctx` (context)
+- **循环变量**: `i`, `j`, `k` (在明确的循环上下文中)
+- **数学/科学**: `x`, `y`, `z`, `dx`, `dy` (在数学计算上下文中)
+- **时间相关**: `ts` (timestamp), `dt` (datetime)
+
+**避免类型前缀**:
+```python
+# ❌ 类型前缀（匈牙利命名法）
+str_name = "John"
+int_count = 10
+list_items = []
+
+# ✅ 清晰命名 + 类型提示
+name: str = "John"
+count: int = 10
+items: list = []
+```
+
+**例外情况 - 需要区分同一概念的不同表示**:
+```python
+# ✅ 临时转换场景
+price_str = "19.99"
+price_float = float(price_str)
+
+# ✅ 不同格式的同一数据
+data_json = fetch_json()
+data_df = pd.DataFrame(data_json)
+```
 
 ### Direct Naming Principle
-- Never add qualifiers like `_clean`, `_new`, `_v2` to production code names
-- Quality is the default expectation, not an exception
-- Replace old code entirely rather than creating parallel versions
-- Let version control handle history, not naming conventions
-- **Rule**: If it's not good enough to be the main version, it shouldn't exist
+- 避免添加 `_clean`, `_new`, `_v2` 等限定词到生产代码
+- 质量是默认期望，不是例外
+- 用版本控制管理历史，不是命名
+- **原则**: 如果代码不够好到成为主版本，就不应该存在
+
+**例外**: 重构过程中的临时共存
+```python
+# ✅ 重构期间临时共存
+def process_data_old(data): ...  # 待删除
+def process_data(data): ...      # 新实现
+
+# 重构完成后删除 _old 版本
+```
 
 ### Design Patterns
-- **Composition over Inheritance**: Prefer composition design patterns
-- **Dependency Injection**: Use dependency injection effectively
-- **Flat Over Nested**: Avoid deep inheritance, prefer composition and dependency injection
-- **Clear Naming**: Remove qualifiers, directly express core functionality
+- **Composition over Inheritance**: 优先组合而非继承
+- **Dependency Injection**: 有效使用依赖注入
+- **Flat Over Nested**: 避免深层继承，优先组合和依赖注入
+- **Clear Naming**: 移除限定词，直接表达核心功能
 
 ## Exception Handling Philosophy
 
@@ -382,12 +445,143 @@ async def main():
     # Command dispatch, not implementation
 ```
 
+## General Rules
+
+### Documentation and Artifacts
+- **No Unsolicited Documentation**: Do NOT create summary documents, README files, verification scripts, or markdown files unless I explicitly ask for them. Just do the work.
+- **No Extra Files**: Avoid creating unnecessary files. Keep solutions focused on the actual requirement.
+
+### Simplicity and Over-Engineering Prevention
+- **Keep Solutions Simple**: Do not over-engineer with unnecessary abstractions, config formats (TOML, DAG, registry, CLI), or extra parameters. Start with the simplest approach that works. If I want more complexity, I'll ask.
+- **No Unnecessary Additions**: Do not add method aliases, backward-compatibility wrappers, or extra parameters I didn't ask for.
+- **Execute Directly**: When I give a concise instruction, execute it directly. Do not ask clarifying questions or explain options unless the request is genuinely ambiguous.
+- **Context-Driven Architecture**: Refer to the "Architecture Decision Guide" section for choosing appropriate complexity levels. Don't apply patterns blindly.
+
+### Project-Specific Conventions (Quant/Factor System)
+- **Partition Format**: `month={YYYY-MM}/data.parquet` (data.parquet is the leaf file, no subdirectory wrapper)
+- **Index vs Factor**: `market_dates` is an INDEX, not a factor
+- **Data Types**: Factor data types are Float64 unless otherwise specified
+- **Method Names**: Use `compute_and_save()` not `generate()` for factor computation
+
 ## Development Guidelines
 - **UV Package Management**: Always use UV for Python package management
 - **No Docker**: Explicitly avoid Docker for this project
 - **No Python Tests**: Never write tests for Python code
 - **No .env Comments**: Never use inline comments in .env files
 - **Avoid node_modules**: Never look into node_modules
+- **Code Quality: Ruff Only**: Use Ruff for linting and formatting, never Pylint
+
+## Python Code Quality Standards
+
+### Use Ruff, Not Pylint
+
+**Core Rule**: Always use Ruff for code quality checks. Pylint is explicitly forbidden.
+
+**Why Ruff?**
+- **Speed**: 10-100x faster than Pylint (Rust implementation)
+- **All-in-One**: Replaces Pylint + Flake8 + isort + Black + pyupgrade
+- **Modern**: Better Python 3.11+ support, actively maintained
+- **Simple Config**: Single `pyproject.toml` configuration
+
+**Why Not Pylint?**
+- Extremely slow on large codebases
+- Complex configuration
+- Redundant with Ruff's capabilities
+- Outdated architecture
+
+### Ruff Configuration Template
+
+```toml
+# pyproject.toml
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "build",
+    "dist",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["your_package"]
+
+[tool.ruff.lint.per-file-ignores]
+# Examples can modify sys.path before imports
+"examples/**" = ["E402"]
+```
+
+### VS Code Integration
+
+```json
+// .vscode/settings.json
+{
+  "python.linting.enabled": false,
+  "python.linting.pylintEnabled": false,
+  "ruff.enable": true,
+  "ruff.lint.enable": true,
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit",
+      "source.fixAll": "explicit"
+    }
+  }
+}
+```
+
+### Disable Pylint Completely
+
+Create `.pylintrc` to prevent accidental usage:
+
+```ini
+# .pylintrc
+[MASTER]
+disable=all  # Pylint is disabled - use Ruff instead
+```
+
+### Daily Commands
+
+```bash
+# Check code quality
+uv run ruff check .
+
+# Auto-fix issues
+uv run ruff check --fix .
+
+# Format code
+uv run ruff format .
+
+# Pre-commit workflow
+uv run ruff check --fix . && uv run ruff format .
+```
+
+### Installation
+
+```bash
+# Add Ruff to dev dependencies
+uv add --dev ruff
+
+# Install VS Code extension: "Ruff" by Astral Software
+# Uninstall Pylint extension if present
+```
 
 ## Python CLI Standards
 
@@ -457,258 +651,520 @@ DEFAULT_TIMEOUT = 30
 ```
 
 ### Project Structure for Python CLI Tools
-**Architecture Principle**: 横切分层 (Horizontal Layering) + 竖切业务 (Vertical Business Slicing)
 
-#### Flat Architecture (PyTorch-style)
+**原则**: 根据项目实际需求组织结构，不要照搬模板
+
+#### 简单项目 (< 5模块)
 ```
 project/
-├── pyproject.toml          # UV project config + scripts
-├── .env                    # Default environment variables  
-├── .env.local             # Local overrides (gitignored)
-├── cli.py                 # Click-based command interface
-├── src/
-│   ├── __init__.py        # Main exports like PyTorch
-│   ├── config.py          # Configuration management
-│   ├── logging.py         # Logging setup
-│   ├── database.py        # Database operations
-│   ├── api_client.py      # External API client
-│   ├── market_data.py     # Market data business logic
-│   ├── portfolio.py       # Portfolio management
-│   ├── risk.py            # Risk calculations
-│   ├── reporting.py       # Reporting logic
-│   ├── sync.py            # Sync operations
-│   ├── streaming.py       # Streaming operations
-│   └── utils.py           # Shared utilities
+├── cli.py
+├── core.py
+├── storage.py
+└── utils.py
 ```
 
-#### Import Pattern (PyTorch-style)
-```python
-# src/__init__.py - Central exports like torch/__init__.py
-from .market_data import get_prices, calculate_returns
-from .portfolio import Portfolio, optimize_weights
-from .risk import calculate_var, stress_test
-from .database import connect, query_data
-from .config import load_config
-
-# Usage - Clean absolute imports
-from src import get_prices, Portfolio, calculate_var
-from src.config import load_config
-from src.database import connect
-
-# NOT relative imports like:
-# from ..database import connect  # ❌
-# from .utils import helper       # ❌
+#### 中等项目 (5-15模块)
+```
+project/
+├── cli.py
+├── core/
+├── storage/
+└── utils/
 ```
 
-#### Vertical Business Slices (竖切 - Business Logic Flow)
-Business features串联multiple modules across the flat architecture:
-
-```python
-# Example: Market Data Sync (竖切业务流)
-# cli.py
-@cli.command()
-def sync_market():
-    from src import sync_market_data  # Clean import from main package
-
-# sync.py (Application orchestration)  
-def sync_market_data():
-    config = load_config()           # config.py
-    client = create_api_client()     # api_client.py  
-    data = fetch_market_data(client) # market_data.py
-    store_data(data)                # database.py
-    log_completion()                # logging.py
-
-# Business logic flows through flat modules without deep nesting
+#### 复杂项目 (> 15模块)
+```
+project/
+├── project/
+│   ├── core/
+│   ├── clients/
+│   ├── database/
+│   ├── business_domain/  # 根据实际业务命名
+│   └── workflows/
+├── pyproject.toml
+└── .env
 ```
 
-#### Layer Responsibilities (Flat Architecture)
-- **cli.py**: Command interface, delegates to application modules
-- **config.py**: Environment and configuration management  
-- **database.py**: All data access operations
-- **api_client.py**: External API integrations
-- **{business}.py**: Domain-specific business logic (market_data.py, portfolio.py, etc.)
-- **{operation}.py**: Application workflows (sync.py, streaming.py, etc.)
-- **utils.py**: Shared utilities and helpers
+**不要**:
+- ❌ 所有项目都用同一套目录结构
+- ❌ 为了"看起来专业"而创建空目录
+- ❌ 照搬别人的目录名（如`equity/`如果不是金融项目）
 
-#### Business Extension Pattern
-Add new features by creating new modules and updating exports:
+**应该**:
+- ✅ 根据实际业务领域命名目录
+- ✅ 根据模块数量决定是否分组
+- ✅ 保持结构简单直到复杂度要求增加
 
-1. **New Domain**: Create `new_feature.py` with business logic
-2. **New Operation**: Create `new_operation.py` for workflows
-3. **Update Exports**: Add to `src/__init__.py` for clean imports
-4. **CLI Integration**: Add commands to `cli.py`
-5. **Reuse Infrastructure**: Use existing `database.py`, `api_client.py`, etc.
+### GitHub协作项目架构决策
 
-```python
-# Adding new feature - flat and simple
-# src/backtesting.py (new domain)
-def run_backtest(strategy, data): ...
+**注意**: 以下原则适用于中大型团队协作项目
 
-# src/batch_backtest.py (new operation) 
-def batch_backtest(): 
-    data = query_data()      # reuse database.py
-    strategy = load_strategy() # reuse config.py
-    results = run_backtest(strategy, data) # use backtesting.py
+#### 核心原则
+1. 模块边界清晰 - 便于代码审查
+2. 导入路径一致
+3. 扩展性友好
 
-# src/__init__.py (update exports)
-from .backtesting import run_backtest
-from .batch_backtest import batch_backtest
-```
+#### 何时应用？
+- 团队 > 3人，需要频繁PR审查
+- 不适用：个人项目、短期项目
 
-### CLI Integration Pattern
-**Combine Click + Command Dispatcher + Environment Management**
-
-```python
-# cli.py - Entry point
-import click
-from dotenv import load_dotenv
-from .operations import sync, stream, detect_gaps
-
-load_dotenv()
-
-@click.group()
-@click.option('--verbose', is_flag=True, help='Enable verbose logging')
-def cli(verbose):
-    """Data processing toolkit."""
-    setup_logging(verbose)
-
-@cli.command()
-@click.option('--batch-size', envvar='BATCH_SIZE', default=100)
-def sync(batch_size):
-    """Sync data incrementally."""
-    sync.run_incremental_sync(batch_size)
-
-# pyproject.toml
-[project.scripts]
-tools = "src.cli:cli"
-```
-
-This allows both:
-- `uv run tools sync --batch-size 50` (direct invocation)
-- `python -m src.cli sync` (module execution)  
-- Environment variable control via `.env` files
+#### 结构对比
+- **平铺**: 简单直接，适合小团队
+- **模块化**: 清晰分组，适合团队协作
+- **过度嵌套**: 导入复杂，不推荐
 
 ---
 
-# 🏗️ PYTORCH ARCHITECTURE ANALYSIS (2024)
+# 🏗️ COMPLEXITY-DRIVEN ARCHITECTURE
 
-## PyTorch的实际混合式架构
+## 核心原则
 
-基于对PyTorch最新代码库的分析，PyTorch采用的是**混合式架构**，而非纯扁平结构：
+**按复杂度分层**:
+- 简单功能 → 单文件模块
+- 中等复杂 → 子目录 + 主文件
+- 高度复杂 → 深层子目录结构
 
-### 1. 顶层组织策略
+**统一导出策略**: 通过`__init__.py`隐藏内部复杂性，用户只需简单导入
+
+**领域内聚**: 相关功能聚合在同一子目录，而非按技术层分散
+
+---
+
+# 🏗️ ARCHITECTURE DECISION GUIDE
+
+## 核心原则：决策驱动，而非模式驱动
+
+**不要**: 所有项目都用同一套架构模式
+**应该**: 根据项目特点选择合适的架构
+
+## 1. 复杂度驱动的架构选择
+
+### 简单项目 (< 5个模块，1-2人团队，< 3个月)
+
 ```python
-# PyTorch实际结构 - 智能分层
-torch/
-├── __init__.py           # 统一API导出
-├── _C/                   # 底层C++绑定
-├── nn/                   # 神经网络模块群
-│   ├── __init__.py       # nn的统一导出
-│   ├── functional.py     # 核心函数实现
-│   ├── modules/          # 具体层类型
-│   ├── attention/        # 注意力机制专门化
-│   ├── quantized/        # 量化专门化
-│   └── parallel/         # 并行处理专门化
-├── optim/                # 优化器模块群
-├── utils/                # 工具函数集群
-├── autograd/             # 自动微分系统
-├── distributed/          # 分布式计算
-├── backends/             # 硬件后端抽象
-└── 60+ specialized dirs  # 领域专门化目录
+# ✅ 扁平结构 - 快速开发
+project/
+├── cli.py          # 命令入口
+├── core.py         # 核心逻辑
+├── storage.py      # 数据存储
+└── utils.py        # 工具函数
 ```
 
-### 2. 关键架构原则
+**特点**:
+- 直接依赖，易于理解
+- 快速迭代，无架构负担
+- 适合原型验证、小工具
 
-#### A. 按复杂度分层
-- **简单功能**: 单文件模块 (如某些utils)
-- **中等复杂**: 子目录 + 主文件 (nn/functional.py)  
-- **高度复杂**: 深层子目录结构 (nn/modules/, nn/quantized/)
+**何时使用**:
+- 功能单一明确
+- 短期项目或实验性项目
+- 团队规模小
 
-#### B. 统一导出策略
+### 中等项目 (5-15个模块，3-5人团队，3-12个月)
+
 ```python
-# torch/__init__.py 提供顶层API
-import torch
-torch.nn.Linear()    # 实际来自 torch/nn/modules/linear.py
-torch.optim.Adam()   # 实际来自 torch/optim/adam.py
-torch.cuda.is_available() # 来自 torch/cuda/__init__.py
-
-# 用户无需知道内部复杂结构
+# ✅ 功能分组 - 平衡组织性与灵活性
+project/
+├── cli.py
+├── core/           # 核心逻辑群
+│   ├── processor.py
+│   └── calculator.py
+├── storage/        # 存储层
+│   ├── reader.py
+│   └── writer.py
+└── utils/
 ```
 
-#### C. 领域专门化
+**特点**:
+- 按功能域分组
+- 2-3层浅层结构
+- 保持灵活性
+
+**何时使用**:
+- 功能模块开始增多
+- 需要多人协作
+- 中期维护项目
+
+### 复杂项目 (> 15个模块，> 5人团队，> 1年维护)
+
 ```python
-# nn模块内部进一步专门化
-torch/nn/
-├── functional.py      # 无状态函数
-├── modules/          # 有状态层
-│   ├── linear.py
-│   ├── conv.py
-│   └── rnn.py
-├── attention/        # 注意力机制独立模块
-├── quantized/        # 量化神经网络独立模块
-└── parallel/         # 并行处理独立模块
+# ✅ 分层架构 - 清晰边界与职责
+project/
+├── cli.py          # Layer 5: CLI
+├── scheduler/      # Layer 4: 调度编排
+├── registry/       # Layer 3: 元数据管理
+├── operators/      # Layer 2: 核心算子
+└── storage/        # Layer 1: 数据持久化
 ```
 
-### 3. 对量化项目的启示
+**特点**:
+- 单向依赖（上层依赖下层）
+- 每层职责明确
+- 独立测试
 
-#### 采用PyTorch式混合架构
+**何时使用**:
+- 模块间依赖复杂
+- 长期维护需求
+- 多团队协作
+
+**案例**: Shadow Factor (5层架构，143GB数据，15+模块)
+
+### 何时增加架构复杂度？
+
+**触发信号**:
+- ⚠️ 模块间依赖混乱，修改一处影响多处
+- ⚠️ 测试需要mock大量依赖
+- ⚠️ 新人理解代码需要超过1周
+- ⚠️ 功能扩展需要修改多个不相关文件
+
+**不要过早分层**:
+- ❌ 项目初期，功能未稳定
+- ❌ 依赖关系简单清晰
+- ❌ 团队规模小（1-2人）
+- ❌ 为了"看起来专业"而分层
+
+## 2. 性能优化决策树
+
+### 原则：先测量，再优化
+
 ```python
-# ✅ 基于复杂度的智能分层
-quant_project/
-├── pyproject.toml
-├── .env / .env.local
-├── cli.py                    # 命令入口
-├── src/
-│   ├── __init__.py          # 统一API导出
-│   ├── config.py            # 简单 - 单文件
-│   ├── utils.py             # 简单 - 单文件  
-│   ├── database.py          # 中等 - 单文件
-│   ├── market_data/         # 复杂 - 子目录
-│   │   ├── __init__.py
-│   │   ├── fetchers.py      # 数据获取
-│   │   ├── processors.py    # 数据处理
-│   │   └── validators.py    # 数据验证
-│   ├── portfolio/           # 复杂 - 子目录
-│   │   ├── __init__.py
-│   │   ├── optimization.py  # 投资组合优化
-│   │   ├── rebalancing.py   # 再平衡
-│   │   └── risk_models.py   # 风险模型
-│   ├── backtesting/         # 高度复杂 - 深层子目录
-│   │   ├── __init__.py
-│   │   ├── engines/         # 回测引擎
-│   │   ├── metrics/         # 评估指标
-│   │   └── reports/         # 报告生成
-│   └── streaming/           # 中等 - 子目录
-│       ├── __init__.py
-│       ├── real_time.py     # 实时数据
-│       └── batch.py         # 批量处理
+# ❌ 过早优化
+def read_data():
+    # 立即使用零拷贝、内存映射、并行读取...
+    # 但数据量只有100行
+
+# ✅ 根据实际需求优化
+def read_data():
+    # 先用简单方式实现
+    # 测量发现瓶颈后再优化
 ```
 
-#### 导出策略
+### 何时需要零拷贝优化？
+
+**触发条件**:
+- 数据量 > 1GB
+- 查询频率 > 100次/秒
+- 延迟要求 < 100ms
+- 内存受限环境
+
+**实现方式**:
 ```python
-# src/__init__.py - PyTorch风格的API设计
-from .config import load_config
-from .database import connect, save_data
-from .utils import setup_logging
+# PyArrow零拷贝 + 内存映射
+dataset = ds.dataset(
+    data_path,
+    format="parquet",
+    partitioning="hive"
+)
 
-# 从复杂模块导出关键API
-from .market_data import fetch_prices, process_ohlc
-from .portfolio import Portfolio, optimize_weights
-from .backtesting import BacktestEngine, run_backtest
-
-# 使用体验
-from src import fetch_prices, Portfolio, run_backtest
-# 而不是复杂的 from src.market_data.fetchers import fetch_prices
+table = dataset.to_table(
+    columns=["date", "code", "factor"],  # 列裁剪
+    filter=date_filter,                   # 谓词下推
+    use_threads=True                      # 并行读取
+)
 ```
 
-### 4. 架构决策原则
+**收益**: Shadow Factor案例 - 34.45M rows/sec，500x回测加速
 
-1. **复杂度导向**: 简单功能用单文件，复杂领域用子目录
-2. **用户友好**: 通过统一导出隐藏内部复杂性  
-3. **领域内聚**: 相关功能聚合在同一子目录内
-4. **扩展灵活**: 新功能可独立添加子目录而不影响现有结构
+**成本**: 需要PyArrow、内存映射逻辑、预加载机制
 
-这种混合式架构比纯扁平结构更适合复杂项目，既保持了简单性又支持了可扩展性。
+**适用**: 回测系统、批量计算、实时交易
+
+### 何时需要智能格式选择？
+
+**触发条件**:
+- 用户类型多样（技术用户 + 非技术用户）
+- 数据量跨度大（KB到GB级别）
+- 网络环境不确定
+
+**实现方式**:
+```python
+def _smart_response(df, request, threshold=None):
+    """根据数据量自动选择格式
+
+    Args:
+        threshold: 格式切换阈值，默认根据项目特点决定
+    """
+    data_size = len(df)
+
+    # 阈值需要根据实际测量调整
+    # Shadow Factor项目的经验值是10,000行
+    # 你的项目可能不同
+    if threshold is None:
+        threshold = 10_000  # 示例值，需要根据实际情况调整
+
+    if data_size < threshold:
+        return json_response(df)  # 小数据：易用性优先
+    else:
+        return arrow_response(df)  # 大数据：性能优先
+```
+
+**收益**: 用户无需理解技术细节，API自动优化
+
+**适用**: 面向多类用户的API服务
+
+**如何确定阈值**:
+1. 测量JSON和Arrow在不同数据量下的性能
+2. 考虑网络带宽和延迟
+3. 考虑客户端解析能力
+4. 从保守值开始，根据监控数据调整
+
+**反模式**:
+- ❌ 所有项目都实现智能选择（过度设计）
+- ❌ 没有测量就优化（premature optimization）
+- ❌ 为单一用户群体做智能选择（增加复杂度无收益）
+- ❌ 照搬别人的阈值（10,000不是魔法数字）
+
+## 3. 部署场景设计
+
+### 单一场景项目
+
+**适用**: 明确的单一用户群体
+
+```python
+# 纯API服务
+@app.get("/api/data")
+def get_data():
+    return data
+
+# 纯本地工具
+def process_local_files():
+    pass
+
+# 纯Python库
+def calculate(x, y):
+    return x + y
+```
+
+**何时使用**:
+- 用户需求一致
+- 部署环境单一
+- 性能要求统一
+
+### 双场景项目
+
+**适用**: 两类不同需求的用户
+
+```python
+# 统一接口，不同实现
+def create_client(mode: str = "auto", **kwargs):
+    if mode == "remote":
+        return RemoteClient(**kwargs)  # HTTP API
+    elif mode == "local":
+        return LocalReader(**kwargs)   # 零拷贝读取
+```
+
+**案例**: Shadow Factor
+- **场景1**: 远程API服务（Web用户，网络传输，访问控制）
+- **场景2**: 本地极速访问（回测系统，零拷贝，微秒级延迟）
+
+**何时使用**:
+- 远程用户 + 本地用户
+- 交互式 + 批量处理
+- 实时 + 离线分析
+
+### 多场景项目
+
+**适用**: 复杂的企业级系统
+
+- API + CLI + SDK + Web UI
+- 实时 + 批量 + 流式处理
+- 多租户 + 多环境
+
+**何时使用**:
+- 用户群体复杂
+- 部署环境多样
+- 企业级需求
+
+## 4. 实战经验库
+
+### 经验1: 智能默认值优于显式配置
+
+**场景**: Shadow Factor API格式选择
+
+**问题**: 用户需要理解JSON vs Arrow IPC的技术区别
+
+**解决**:
+```python
+# ❌ 之前：用户需要指定
+df = api.query_factor("net_profit", format="arrow")
+
+# ✅ 之后：自动选择
+df = api.query_factor("net_profit")  # API根据数据量自动选择
+```
+
+**适用条件**:
+- 技术细节对用户无价值
+- 有明确的优化规则
+- 高级用户可覆盖
+
+**不适用**:
+- 用户需要精确控制
+- 没有明确的默认规则
+- 选择影响业务逻辑
+
+### 经验2: 零拷贝优化的ROI
+
+**场景**: Shadow Factor回测系统
+
+**收益**:
+- 单次查询: 12x提升 (500ms → 40ms)
+- 批量预加载: 12x提升 (5s → 0.4s)
+- 回测循环: 500x提升 (500s → 1s)
+
+**成本**:
+- PyArrow依赖
+- 内存映射逻辑
+- 预加载机制
+- 代码复杂度增加
+
+**适用条件**:
+- 数据量大（> 1GB）
+- 查询频繁（反复读取）
+- 延迟敏感（< 100ms）
+
+**不适用**:
+- 数据量小（< 100MB）
+- 一次性查询
+- 延迟不敏感
+
+### 经验3: 分层架构的演进时机
+
+**场景**: Shadow Factor从扁平到5层架构
+
+**触发条件**:
+- 模块数 > 15
+- 依赖关系复杂
+- 多人协作困难
+
+**收益**:
+- 测试性提升（每层独立测试）
+- 可维护性提升（职责清晰）
+- 扩展性提升（新功能有明确归属）
+
+**成本**:
+- 初期开发速度下降
+- 学习曲线增加
+- 重构成本
+
+**适用**: 长期维护的复杂系统
+
+**不适用**: 短期项目、原型验证
+
+### 经验4: Parquet分区策略
+
+**场景**: Shadow Factor 143GB因子数据存储
+
+**策略**:
+```
+factor_database/data/
+├── base_field=net_profit/    # 第一级分区
+│   └── month=2024-01/         # 第二级分区
+│       └── data.parquet       # 叶子文件
+```
+
+**收益**:
+- 查询只扫描相关分区（分区裁剪）
+- 列裁剪 + 谓词下推
+- 并行读取
+
+**适用**: 大规模时序数据、按时间/类别查询
+
+**不适用**: 小数据集、随机访问模式
+
+## 5. 架构决策检查清单
+
+### 开始新项目时
+
+**复杂度评估**:
+- [ ] 预计模块数量？(< 5 / 5-15 / > 15)
+- [ ] 团队规模？(1-2人 / 3-5人 / > 5人)
+- [ ] 维护周期？(< 3个月 / 3-12个月 / > 1年)
+- [ ] 依赖关系复杂度？(简单 / 中等 / 复杂)
+
+**架构选择**:
+- 简单项目 → 扁平结构
+- 中等项目 → 功能分组
+- 复杂项目 → 考虑分层（但不要过早）
+
+### 遇到性能问题时
+
+**先测量**:
+- [ ] 实际数据量？(KB / MB / GB)
+- [ ] 查询频率？(次/秒)
+- [ ] 当前延迟？(ms)
+- [ ] 目标延迟？(ms)
+- [ ] 瓶颈在哪？(IO / CPU / 网络)
+
+**再优化**:
+- 数据量小 → 不需要优化
+- 数据量大但查询少 → 简单缓存即可
+- 数据量大且查询频繁 → 考虑零拷贝、预加载
+
+### 设计API时
+
+**用户分析**:
+- [ ] 用户技术水平？(技术 / 非技术 / 混合)
+- [ ] 数据量范围？(KB / MB / GB)
+- [ ] 使用场景？(交互 / 批量 / 实时)
+- [ ] 网络环境？(内网 / 公网 / 混合)
+
+**设计选择**:
+- 技术用户 → 可以暴露细节，提供精确控制
+- 非技术用户 → 智能默认值，隐藏技术细节
+- 混合用户 → 智能默认 + 高级覆盖选项
+
+## 6. 反模式警示
+
+### 架构反模式
+
+❌ **过早分层**: 5个模块就搞5层架构
+❌ **教条主义**: 所有项目都用同一套架构
+❌ **过度抽象**: 为了"灵活性"增加3层间接层
+❌ **盲目模仿**: 看到大公司用微服务就拆分
+
+### 性能反模式
+
+❌ **过早优化**: 没测量就优化
+❌ **过度优化**: 100行数据用零拷贝
+❌ **盲目优化**: 优化非瓶颈部分
+❌ **技术炫技**: 为了用新技术而优化
+
+### API设计反模式
+
+❌ **暴露实现**: 让用户选择JSON vs Arrow
+❌ **参数爆炸**: 20个配置参数
+❌ **一刀切**: 所有场景用同一个API
+❌ **过度灵活**: 支持100种组合但没人用
+
+## 7. 如何使用这些经验？
+
+### 正确方式
+
+✅ **参考，不照搬**: 理解背后的原因，根据项目调整
+✅ **测量，再决策**: 用数据支持架构决策
+✅ **渐进演化**: 从简单开始，根据需要增加复杂度
+✅ **问题驱动**: 遇到具体问题时参考相关经验
+
+### 错误方式
+
+❌ **直接复制**: 把Shadow Factor的5层架构复制到所有项目
+❌ **盲目应用**: 不管项目特点，套用所有优化
+❌ **教条执行**: 把经验当成必须遵守的规则
+❌ **过度设计**: 为了"未来可能需要"而增加复杂度
+
+## 总结
+
+**核心思想**:
+1. **决策驱动，而非模式驱动** - 根据实际情况选择架构
+2. **测量驱动，而非假设驱动** - 用数据支持优化决策
+3. **问题驱动，而非技术驱动** - 解决实际问题，不炫技
+4. **渐进演化，而非一步到位** - 从简单开始，逐步优化
+
+**记住**:
+- 简单项目用简单架构
+- 复杂项目才需要复杂架构
+- 先让它工作，再让它快
+- 架构为业务服务，不是反过来
 
 ## Documentation Links
 - **SiliconCloud/SiliconFlow LLMs Documentation**:
@@ -719,249 +1175,83 @@ from src import fetch_prices, Portfolio, run_backtest
 
 # 🎯 DEVELOPMENT INTERACTION PRINCIPLES
 
-## Purpose: Prevent Over-Engineering Through Clear Communication
+## Core Rules
 
-### The Problem
-AI assistants often make assumptions about user needs, leading to over-engineered solutions with unnecessary complexity, unused features, and bloated codebases.
+### 1. Clarification Before Implementation
+Ask when request contains ambiguous terms, multiple approaches exist, or technical choices affect complexity
 
-### The Solution: Ask-First Development
-
-## Core Interaction Rules
-
-### 1. Clarification Before Implementation (Ask Before Assume)
-**Purpose**: Eliminate assumptions that lead to over-engineering
-
-**When to Ask**:
-- User request contains ambiguous terms ("process", "support", "optimize", "handle")
-- Multiple implementation approaches exist
-- Technical choices affect system complexity
-- External integrations or APIs involved
-
-**How to Ask**:
-```
-"I understand you need [core requirement]. To implement the right solution:
-1. [Specific technical question]
-2. [Scope/boundary question]
-3. [Format/interface question]
-Which approach fits your actual needs?"
-```
-
-**Example**:
-- User: "Download news from Sina"
-- Ask: "Which Sina API? What data format? JSON or XML? Which fields do you need?"
-- Don't assume: RSS support + scheduling + multiple sources + enterprise features
-
-### 2. Minimal Viable Implementation (Start Simple)
-**Purpose**: Deliver value quickly without unnecessary complexity
-
-**Implementation Strategy**:
-- Solve the core problem first, ignore edge cases
-- One file per distinct problem
+### 2. Minimal Viable Implementation
+- Solve core problem first, ignore edge cases
+- One file per distinct problem (unless complexity requires more)
 - Single responsibility per module
-- Defer optimization and features until requested
+- Defer optimization until requested
 
-**Complexity Budgets**:
-- Single file: aim for <100 lines unless complexity is essential
-- New modules: maximum 2 files unless user explicitly needs more
-- Dependencies: only add what's immediately necessary
+**复杂度指引**:
+- 文件超过300行且难以理解 → 考虑拆分
+- 一个模块有10+个文件但功能简单 → 可能过度拆分
+- 依赖超过核心功能需要 → 可能过度设计
 
-**Layered Approach**:
-```
-Layer 1: Core functionality (must have)
-Layer 2: Convenience features (ask user)
-Layer 3: Advanced capabilities (user must explicitly request)
-```
+**渐进式开发**: 让它工作 → 让它好用 → 让它强大
 
-### 3. Incremental Validation (Validate Early, Validate Often)
-**Purpose**: Ensure development stays aligned with actual needs
+### 3. Incremental Validation
+Validate after clarification, after core implementation, before adding features
 
-**Validation Points**:
-- After requirement clarification: "Is my understanding correct?"
-- After core implementation: "Does this solve your problem?"
-- Before adding features: "Do you need [specific enhancement]?"
-- When complexity increases: "This requires [cost]. Still needed?"
+### 4. Complexity Transparency
+Alert when file count > 2, line count > 150, new dependencies, or additional config needed
 
-**Feedback Loop**:
-```
-Requirement → Clarify → Minimal Implementation → User Validation → 
-Enhancement Decision → Implementation → Validation → Continue
-```
+### 5. Scope Boundary Management
+One module = one problem domain. Cross-cutting concerns need explicit approval.
 
-### 4. Complexity Transparency (Honest Cost Communication)
-**Purpose**: Help users make informed decisions about feature complexity
+### 6. Technical Debt Transparency
+Communicate current limitations, future costs, alternative approaches, and performance implications
 
-**Alert Triggers**:
-- File count > 2 for single feature
-- Line count > 150 for single module
-- New significant dependencies
-- Additional configuration requirements
+## Daily Checklist
 
-**Communication Template**:
-```
-"Implementing [feature] requires:
-- [X] additional files
-- [Y] new dependencies  
-- [Z] configuration steps
-- [Time] development effort
+**Before**: Requirements clear? Making assumptions? Simplest solution? Complexity justified?
+**During**: Solving unmentioned problems? Complexity justified? Can simplify?
+**After**: Confirmed solution meets needs? Obvious next steps? Ask about requirements?
 
-Simple version handles [core use case]. 
-Full version adds [advanced capabilities].
-Which do you prefer?"
-```
+---
 
-### 5. Scope Boundary Management (Clear Limits)
-**Purpose**: Prevent feature creep and maintain module coherence
+# 📋 SESSION MANAGEMENT & WORKFLOW
 
-**Boundary Principles**:
-- One module = one problem domain
-- Cross-cutting concerns need explicit user approval
-- Feature overlap requires consolidation decision
-- Integration complexity needs justification
+## Break Tasks into Focused Sessions
+Mega-sessions accumulate errors. Split into: design → implementation → validation → git
 
-**Decision Framework**:
-- New feature in existing module: preferred approach
-- New module creation: requires clear separation of concerns  
-- Cross-module functionality: needs explicit user requirement
+## Lead with Reference Files
+Provide reference data upfront for validation tasks to enable pattern-matching
 
-### 6. Technical Debt Transparency (Honest Trade-offs)
-**Purpose**: Set proper expectations about implementation choices
+## Use Explicit Stop Constraints
+Set clear boundaries: "Edit ONLY file X. Do not create new files."
 
-**What to Communicate**:
-- Current implementation limitations
-- Future extension costs
-- Alternative approaches available
-- Performance/scalability implications
+---
 
-**Example Communication**:
-```
-"This implementation handles your current needs but has limitations:
-- [Specific constraint 1]
-- [Specific constraint 2]
-- [Scaling consideration]
+# 🔧 GIT OPERATIONS
 
-For full requirements, would need [specific changes].
-Is the current approach sufficient?"
-```
-
-## Daily Development Checklist
-
-**Before Implementation**:
-- [ ] Are user requirements 100% clear?
-- [ ] Am I making assumptions about unstated needs?
-- [ ] What's the simplest solution that works?
-- [ ] Does complexity match actual requirements?
-
-**During Implementation**:
-- [ ] Am I solving problems the user didn't mention?
-- [ ] Is code complexity justified by real requirements?
-- [ ] Can this be simplified without losing functionality?
-
-**After Implementation**:
-- [ ] Have I confirmed the solution meets user needs?
-- [ ] Are there obvious next steps the user might want?
-- [ ] Should I ask about additional requirements?
-
-## Success Metrics
-
-**Good Development Session**:
-- User gets exactly what they need
-- No unused features or complexity
-- Clear path for future enhancements
-- Minimal surprise or confusion
-
-**Failed Development Session**:
-- User overwhelmed by unexpected complexity
-- Features implemented that user doesn't need
-- Solution requires explanation to understand
-- User has to remove or simplify delivered code
+Always verify directory with `pwd` before git commands to avoid wrong directory errors.
 
 ---
 
 # 🌐 FRAMEWORK-SPECIFIC GUIDELINES
 
 ## FastAPI Production Standards
-**Apply only when building FastAPI applications**
 
-### 1. Router Organization
-- **Mandatory**: Use `APIRouter` for multiple endpoint groups
-- **Structure**: One router per domain (items, users, auth, etc.)
-- **Prefixes**: Clear, RESTful prefixes (`/items`, `/users`)
+### Router Organization
+Use `APIRouter` for multiple endpoint groups, one router per domain
 
-```python
-# ✅ Organized routing
-from fastapi import APIRouter
+### Operation Separation
+Extract business logic from endpoints - endpoints route, operations implement
 
-router = APIRouter(prefix="/items")
+### Deployment-First
+Set up health endpoint + deployment pipeline before building features
 
-@router.get("/{item_id}")
-def get_item(item_id: int):
-    return get_database_item(item_id)
-```
+### Access Control
+Implement both authentication and rate limiting (use SlowAPI)
 
-### 2. Operation Separation
-- **Rule**: Extract business logic from endpoint functions
-- **Pattern**: Endpoints only handle routing, operations handle business logic
-- **Benefits**: Better testing, code reuse, cleaner separation of concerns
-
-```python
-# ✅ Separated concerns
-@router.post("/items")
-def create_item(item: ItemCreate, db: Session = Depends(get_database)):
-    return create_database_item(item, db)  # Operation in separate module
-
-# ❌ Mixed concerns
-@router.post("/items") 
-def create_item(item: ItemCreate):
-    # Database logic, validation, business rules all mixed here...
-```
-
-### 3. Deployment-First Development
-- **Priority**: Set up deployment pipeline before building features
-- **Start**: Health check endpoint + Docker + CI/CD
-- **Reason**: Deployment issues are the hardest to debug and most time-consuming
-
-**Deployment Checklist**:
-- [ ] Basic health endpoint (`/health`)
-- [ ] Dockerfile with proper dependencies
-- [ ] Cloud deployment configuration
-- [ ] CI/CD pipeline setup
-- [ ] Then build actual features
-
-### 4. Access Control Implementation
-**Both authentication and rate limiting are required**
-
-#### Rate Limiting (SlowAPI)
-```python
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-
-limiter = Limiter(key_func=get_remote_address)
-
-@router.get("/items/{item_id}")
-@limiter.limit("10/second")
-def get_item(request: Request, item_id: int):
-    return get_database_item(item_id)
-```
-
-#### Dependency Injection Pattern
-```python
-def get_database():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Use in endpoints
-def create_item(item: ItemCreate, db: Session = Depends(get_database)):
-    return create_database_item(item, db)
-```
-
-### FastAPI Boundary Rules
-- **External API boundaries**: Full validation, rate limiting, authentication
-- **Internal operations**: Trust parameters, let SQLAlchemy handle database errors
-- **Database sessions**: Always use dependency injection
-- **Return types**: Pydantic models for API responses, not raw database objects
+### Boundary Rules
+- External API: Full validation, rate limiting, auth
+- Internal operations: Trust parameters, let frameworks handle errors
+- Use dependency injection for database sessions
 
 ---
 
@@ -1006,3 +1296,5 @@ def process_and_store(data):
 4. **New team members can understand and modify the system quickly**
 - My Obsidian vault is at /Users/yanghh/obs. If you need to write down any summaries, notes, or knowledge pages, this is where you want to save them.
 - NEVER GIT COMMIT WITH CLAUDE CODE COAUTHORSHIP
+- Let errors fail naturally. Never use try-except pattern before the user asks you to.
+- NEVER GIT COMMIT WITH CLAUDE CODE COAUTHORSHIP.
