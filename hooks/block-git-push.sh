@@ -5,7 +5,23 @@
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command')
 
-if echo "$COMMAND" | grep -qE "(^|[;&|[:space:]])git\s+push([[:space:]]|$)"; then
+# Strip quoted strings before scanning, so 'git push' inside -m "..." is ignored
+STRIPPED=$(echo "$COMMAND" | sed "s/\"[^\"]*\"//g; s/'[^']*'//g")
+
+if echo "$STRIPPED" | awk '
+{
+    n = split($0, tokens, /[[:space:]]+/)
+    for (i = 1; i <= n; i++) {
+        t = tokens[i]
+        gsub(/^[;&|]+/, "", t)
+        if (t == "git" && i < n) {
+            next_t = tokens[i+1]
+            gsub(/^[;&|]+/, "", next_t)
+            if (next_t == "push") { exit 0 }
+        }
+    }
+    exit 1
+}'; then
     echo "git push is blocked. Push manually after reviewing changes." >&2
     exit 2
 fi
