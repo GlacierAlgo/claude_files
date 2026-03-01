@@ -25,4 +25,4 @@ commands/micropomodoro.md
 *.local
 *.cache
 session-*
-temp-*
+temp-*node_modules/
