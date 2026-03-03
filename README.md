@@ -1,55 +1,53 @@
 # Claude Code Configuration Repository
 
-This repository serves as a **dotfiles-style configuration hub** for Claude Code, containing personalized settings, commands, and session data that enhance AI-assisted development workflows.
+This repository serves as a **single source of truth** for Claude Code configuration, using symbolic links to maintain consistency across your system.
 
 ## Purpose
 
-Similar to how dotfiles repositories store terminal configurations, shell aliases, and development environment setups, this repo maintains:
+This repo maintains all Claude Code configuration files in version control and uses symbolic links to connect them to `~/.claude/`:
 
 - **Global development philosophy** (`CLAUDE.md`) - Core coding principles and patterns
-- **Custom commands** (`commands/`) - Specialized workflow enhancements 
-- **Project session history** (`projects/`) - Context and conversation logs per project
-- **Task management data** (`todos/`) - Session-specific todo tracking
+- **Hooks** (`hooks/`) - Pre/post command execution scripts
+- **Status line** (`statusline-enhanced.sh`) - Custom status bar display
 - **User settings** (`settings.json`) - Claude Code preferences
+
+## Setup
+
+Run the setup script to create symbolic links from `~/.claude/` to this repository:
+
+```bash
+./setup-symlinks.sh
+```
+
+This will:
+1. Backup existing files to `~/.claude/backups/`
+2. Create symlinks for: `CLAUDE.md`, `settings.json`, `statusline-enhanced.sh`, `hooks/`
+3. Make this repository the single source of truth for your configuration
 
 ## File Structure
 
-### Version Controlled (Shared)
+### Symlinked to ~/.claude/ (Single Source of Truth)
 ```
-├── CLAUDE.md              # Master development guidelines & philosophy
-├── README.md              # This documentation
-├── .gitignore             # Repository file management
-└── commands/              # Custom command definitions
-    ├── askmore.md         # Enhanced clarification protocol
-    └── drawio.md          # Diagram generation workflows
-```
-
-### Local Only (Private)
-```
-├── projects/              # Per-project session logs (JSONL format)
-├── todos/                 # Task management state files
-├── settings.json          # Claude Code user preferences
-├── statsig/              # Analytics & feature flags
-└── commands/
-    └── micropomodoro.md   # Local command experiments
+├── CLAUDE.md                    # Master development guidelines
+├── settings.json                # Claude Code preferences
+├── statusline-enhanced.sh       # Custom status bar
+└── hooks/                       # Command execution hooks
+    ├── block-git-push.sh       # Prevent accidental pushes
+    ├── block-npm.sh            # Enforce package manager
+    ├── block-pip.sh            # Enforce uv for Python
+    └── notify-command-end.py   # macOS notifications
 ```
 
-## Dotfiles Similarity
+### Version Controlled
+```
+├── setup-symlinks.sh           # Symlink setup script
+├── package.json                # Node dependencies for hooks
+└── README.md                   # This documentation
+```
 
-Like traditional dotfiles, this repo:
-- **Personalizes** the development environment for your workflow
-- **Persists** preferences across sessions and projects
-- **Centralizes** configuration in version control
-- **Enables** rapid environment setup on new machines
-- **Maintains** development context and history
+## Benefits
 
-## Key Features
-
-- **Philosophy-Driven Development**: `CLAUDE.md` encodes development principles that guide all AI interactions
-- **Session Persistence**: Project conversations and context survive across sessions
-- **Custom Commands**: Specialized workflows for enhanced productivity
-- **Structured Logging**: JSONL format for easy parsing and analysis
-
-## Note on Repository State
-
-This repo intentionally maintains more files locally than in git to preserve sensitive session data while keeping core configurations shareable.
+- **Single Source of Truth**: All changes in this repo automatically apply to Claude Code
+- **Version Control**: Track configuration changes over time
+- **Easy Backup**: Clone this repo to restore your setup
+- **Portable**: Run `setup-symlinks.sh` on any machine to replicate your environment
