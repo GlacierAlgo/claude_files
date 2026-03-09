@@ -83,7 +83,8 @@ Don't implement features until actually needed. Magic numbers stay. No speculati
 ## Development Guidelines
 - **UV Package Management**: Always use UV for Python package management
 - **No Docker**: Explicitly avoid Docker for this project
-- **No Python Tests**: Never write tests for Python code
+- **No pytest / mock-based tests**: Never write pytest or unittest style tests. Tests that mock dependencies and verify return values test implementation details, not behavior — they break on refactors and provide false confidence.
+- **Scenario-based regression scripts instead**: When verification is needed, write scripts in `scripts/verify_*.py`. A valid scenario states *why* a behavior should hold (the business invariant), uses real or minimal synthetic data without mocks, survives internal refactors, and fails only when a business contract is broken. Each scenario has an explicit `hypothesis` string answering "why should this behavior hold", not "what output do I expect".
 - **No .env Comments**: Never use inline comments in .env files
 - **Avoid node_modules**: Never look into node_modules
 - **Code Quality**: Use Ruff for linting and formatting, never Pylint
