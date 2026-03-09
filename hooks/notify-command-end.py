@@ -8,7 +8,7 @@ import json
 import subprocess
 from datetime import datetime
 
-LOG_FILE = os.path.expanduser('~/.claude/hooks/notify-debug.log')
+LOG_FILE = os.path.expanduser('~/.claude/logs/notify-debug.log')
 
 def log(msg):
     """写入日志文件和标准输出"""

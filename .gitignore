@@ -25,4 +25,8 @@ commands/micropomodoro.md
 *.local
 *.cache
 session-*
-temp-*node_modules/
+temp-*
+node_modules/
+
+# Log files
+logs/
