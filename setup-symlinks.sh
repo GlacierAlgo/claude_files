@@ -18,6 +18,7 @@ ITEMS=(
     "settings.json"
     "statusline-enhanced.sh"
     "hooks"
+    "skills"
 )
 
 # Create backup directory with timestamp
